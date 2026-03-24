@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+
+# Data files (too large for git)
+*.csv
+
+# API Keys
+config.py
+
+# OS
+.DS_Store

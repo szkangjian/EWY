@@ -1,0 +1,32 @@
+name: SEC Dividend Monitor
+
+on:
+  schedule:
+    # 每天 13:00 和 22:00 UTC 运行 (美东夏令时 9 AM 和 6 PM)
+    - cron: '0 13,22 * * *'
+  workflow_dispatch: # 允许在 Actions 面板手动触发测试
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # 必须保留读取代码的权限！
+      issues: write # 允许以当前 Repo 的身份创建 Issue
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install dependencies
+        run: |
+          pip install feedparser requests
+          
+      - name: Run Alert Monitor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          POLYGON_KEY: ${{ secrets.POLYGON_KEY }}
+        run: python .github/scripts/check_sec_and_alert.py
