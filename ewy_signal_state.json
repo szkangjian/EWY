@@ -1,0 +1,11 @@
+{
+  "ibs_position": null,
+  "drop_position": {
+    "buy_date": "2026-03-23",
+    "buy_price": 124.4,
+    "days_held": 0
+  },
+  "trade_log": [],
+  "consecutive_exp_losses": 0,
+  "circuit_breaker": false
+}
