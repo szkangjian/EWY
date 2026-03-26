@@ -127,9 +127,8 @@ def run():
             qty = cfg.get("quantity", 100)
             msg = (
                 f"🔴 <b>EWY 跌幅买入信号</b>\n\n"
-                f"👉 买入 {qty} 股 EWY @ ${entry_price:.2f}\n\n"
-                f"当前: <b>${price:.2f}</b> ({drop_pct*100:+.1f}%)\n"
-                f"前日收盘: ${prev_close:.2f}\n"
+                f"👉 买入 {qty} 股 EWY @ ${entry_price:.2f}\n"
+                f"已跌 {abs(drop_pct)*100:.1f}%（当前 ${price:.2f}，前日收盘 ${prev_close:.2f}）\n\n"
                 f"反弹目标: ${target_price:.2f} (+{DROP_EXIT*100:.1f}%)\n"
                 f"最大持有: {cfg.get('drop_max_hold', 3)} 天\n\n"
                 f"⏰ {datetime.now().strftime('%H:%M ET')}"
