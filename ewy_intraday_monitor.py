@@ -124,11 +124,12 @@ def run():
         if level not in alerts["drop_levels"]:
             alerts["drop_levels"].append(level)
 
+            qty = cfg.get("quantity", 100)
             msg = (
                 f"🔴 <b>EWY 跌幅买入信号</b>\n\n"
+                f"👉 买入 {qty} 股 EWY @ ${entry_price:.2f}\n\n"
                 f"当前: <b>${price:.2f}</b> ({drop_pct*100:+.1f}%)\n"
                 f"前日收盘: ${prev_close:.2f}\n"
-                f"入场价: ${entry_price:.2f} (跌{abs(DROP_ENTRY)*100:.0f}%触发)\n"
                 f"反弹目标: ${target_price:.2f} (+{DROP_EXIT*100:.1f}%)\n"
                 f"最大持有: {cfg.get('drop_max_hold', 3)} 天\n\n"
                 f"⏰ {datetime.now().strftime('%H:%M ET')}"
@@ -160,11 +161,12 @@ def run():
             state["consecutive_exp_losses"] = 0
             save_state(state)
 
+            qty = cfg.get("quantity", 100)
             msg = (
                 f"🟢 <b>EWY 反弹达标!</b>\n\n"
+                f"👉 卖出 {qty} 股 EWY（{pos['buy_date']} 买入 @ ${buy_price:.2f}）\n\n"
                 f"当前: <b>${price:.2f}</b>\n"
-                f"买入: ${buy_price:.2f} ({pos['buy_date']})\n"
-                f"反弹: {rebound*100:+.1f}% (目标 +{DROP_EXIT*100:.1f}%)\n\n"
+                f"收益: {rebound*100:+.1f}%（目标 +{DROP_EXIT*100:.1f}%）\n\n"
                 f"建议立即卖出\n"
                 f"⏰ {datetime.now().strftime('%H:%M ET')}"
             )
