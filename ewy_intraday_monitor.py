@@ -68,7 +68,17 @@ def save_alerts(alerts: dict):
 def load_state() -> dict:
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text())
-    return {}
+    return {
+        "ibs_position": None,
+        "drop_position": None,
+        "trade_log": [],
+        "consecutive_exp_losses": 0,
+        "circuit_breaker": False,
+    }
+
+
+def save_state(state: dict):
+    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
 
 
 def run():
@@ -95,14 +105,24 @@ def run():
     state = load_state()
 
     # ---- 跌幅买入信号 ----
-    if drop_pct <= DROP_ENTRY:
-        # 按整数百分点分档，避免重复通知
+    if drop_pct <= DROP_ENTRY and not state.get("circuit_breaker"):
+        entry_price = prev_close * (1 + DROP_ENTRY)
+        target_price = entry_price * (1 + DROP_EXIT)
+
+        # 首次触发：记录持仓到 state（支持日内反弹监控）
+        if not state.get("drop_position"):
+            state["drop_position"] = {
+                "buy_date": today,
+                "buy_price": round(entry_price, 2),
+                "days_held": 0,
+            }
+            save_state(state)
+            log.info(f"DROP position recorded: ${entry_price:.2f}")
+
+        # 按整数百分点分档通知，避免重复
         level = int(drop_pct * 100)  # e.g., -3, -5, -7
         if level not in alerts["drop_levels"]:
             alerts["drop_levels"].append(level)
-
-            entry_price = prev_close * (1 + DROP_ENTRY)
-            target_price = entry_price * (1 + DROP_EXIT)
 
             msg = (
                 f"🔴 <b>EWY 跌幅买入信号</b>\n\n"
@@ -124,16 +144,32 @@ def run():
 
         if rebound >= DROP_EXIT:
             alerts["rebound_alerted"] = True
+
+            # 记录交易并清持仓
+            sell_price = buy_price * (1 + DROP_EXIT)
+            state["trade_log"].append({
+                "buy_date": pos["buy_date"],
+                "sell_date": today,
+                "buy_price": buy_price,
+                "sell_price": round(sell_price, 2),
+                "days": pos["days_held"],
+                "ret": round(DROP_EXIT * 100, 2),
+                "reason": "TP",
+            })
+            state["drop_position"] = None
+            state["consecutive_exp_losses"] = 0
+            save_state(state)
+
             msg = (
                 f"🟢 <b>EWY 反弹达标!</b>\n\n"
                 f"当前: <b>${price:.2f}</b>\n"
                 f"买入: ${buy_price:.2f} ({pos['buy_date']})\n"
                 f"反弹: {rebound*100:+.1f}% (目标 +{DROP_EXIT*100:.1f}%)\n\n"
-                f"建议收盘前卖出\n"
+                f"建议立即卖出\n"
                 f"⏰ {datetime.now().strftime('%H:%M ET')}"
             )
             notifier.send_text(msg)
-            log.info(f"Rebound alert sent: {rebound*100:+.1f}%")
+            log.info(f"Rebound alert sent: {rebound*100:+.1f}%, position closed")
 
     # ---- IBS 持仓反弹/止损监控 ----
     if state.get("ibs_position"):
