@@ -43,7 +43,6 @@ def run(do_update: bool = True):
 
     if not results:
         log.info("No signals today")
-        _send_daily_status(strategy)
     else:
         for r in results:
             sig = r["signal"]
@@ -52,26 +51,6 @@ def run(do_update: bool = True):
             log.info(f"{sig.symbol} {sig.direction} [{sig.data.get('sub_strategy','')}] "
                      f"{status}: {sig.data.get('reason', '')}")
 
-
-def _send_daily_status(strategy):
-    """无信号时发送持仓状态。"""
-    if strategy._state is None:
-        return
-
-    holding = []
-    if strategy._state.get("ibs_position"):
-        p = strategy._state["ibs_position"]
-        holding.append(f"IBS: day {p['days_held']} @ ${p['buy_price']:.2f}")
-    if strategy._state.get("drop_position"):
-        p = strategy._state["drop_position"]
-        holding.append(f"DROP: day {p['days_held']} @ ${p['buy_price']:.2f}")
-
-    if holding:
-        notifier.send_text(
-            f"📊 EWY 日报\n\n"
-            f"持仓: {', '.join(holding)}\n"
-            f"今日无新信号"
-        )
 
 
 def main():

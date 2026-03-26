@@ -12,3 +12,4 @@ config.py
 
 # OS
 .DS_Store
+.ewy_intraday_alerts.json

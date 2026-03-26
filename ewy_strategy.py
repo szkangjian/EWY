@@ -222,6 +222,7 @@ class EWYStrategy(Strategy):
                     }))
                 self._record_trade(pos, date_str, close, "IBS>0.8", hold_ret)
                 self._state["ibs_position"] = None
+                self._close_db_position("EWY_IBS", "EWY")
                 if hold_ret > 0:
                     self._state["consecutive_exp_losses"] = 0
 
@@ -240,6 +241,7 @@ class EWYStrategy(Strategy):
                     }))
                 self._record_trade(pos, date_str, close, "EXP", hold_ret)
                 self._state["ibs_position"] = None
+                self._close_db_position("EWY_IBS", "EWY")
                 if hold_ret < 0:
                     self._state["consecutive_exp_losses"] += 1
                 else:
@@ -268,6 +270,9 @@ class EWYStrategy(Strategy):
                     "buy_price": round(close, 2),
                     "days_held": 0,
                 }
+                from qbot import db
+                db.open_position("EWY_IBS", "EWY", p.get("quantity", 100),
+                                 round(close, 2), date_str)
             else:
                 reasons = []
                 if not ibs_low:
@@ -305,6 +310,7 @@ class EWYStrategy(Strategy):
                     }))
                 self._record_trade(pos, date_str, sell_price, "TP", p["drop_exit"])
                 self._state["drop_position"] = None
+                self._close_db_position("EWY_DROP", "EWY")
                 self._state["consecutive_exp_losses"] = 0
 
             elif pos["days_held"] >= p["drop_max_hold"]:
@@ -321,6 +327,7 @@ class EWYStrategy(Strategy):
                     }))
                 self._record_trade(pos, date_str, close, "EXP", hold_ret)
                 self._state["drop_position"] = None
+                self._close_db_position("EWY_DROP", "EWY")
                 if hold_ret < 0:
                     self._state["consecutive_exp_losses"] += 1
                 else:
@@ -352,6 +359,9 @@ class EWYStrategy(Strategy):
                     "buy_price": round(buy_price, 2),
                     "days_held": 0,
                 }
+                from qbot import db
+                db.open_position("EWY_DROP", "EWY", p.get("quantity", 100),
+                                 round(buy_price, 2), date_str)
             else:
                 if self._state["circuit_breaker"]:
                     log.info("DROP no entry (circuit breaker)")
@@ -383,6 +393,13 @@ class EWYStrategy(Strategy):
             "ret": round(ret * 100, 2),
             "reason": reason,
         })
+
+    @staticmethod
+    def _close_db_position(strategy: str, symbol: str):
+        """关闭 qbot DB 中的持仓。"""
+        from qbot import db
+        for p in db.get_open_positions(strategy=strategy, symbol=symbol):
+            db.close_position(p["id"])
 
     # ── 订单设计 ──────────────────────────────────────────
 

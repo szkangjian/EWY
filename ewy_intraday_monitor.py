@@ -35,16 +35,24 @@ DROP_EXIT = cfg.get("drop_exit", 0.025)
 
 
 def load_prev_close() -> float | None:
-    """从历史 CSV 获取最近一个交易日收盘价。"""
+    """从 Yahoo Finance 获取前一交易日收盘价。"""
+    try:
+        import yfinance as yf
+        t = yf.Ticker("EWY")
+        prev = t.fast_info.get("previousClose") or t.fast_info.get("regularMarketPreviousClose")
+        if prev:
+            return float(prev)
+    except Exception as e:
+        log.error(f"Yahoo prev close failed: {e}")
+    # 回退到本地 CSV
     try:
         df = pd.read_csv(DATA_CSV, parse_dates=['timestamp'])
         df['date'] = df['timestamp'].dt.date
-        daily = df.groupby('date').agg(Close=('Close', 'last')).reset_index()
-        daily = daily.sort_values('date')
+        daily = df.groupby('date').agg(Close=('Close', 'last')).sort_values('date')
         if len(daily) >= 1:
             return float(daily.iloc[-1]['Close'])
     except Exception as e:
-        log.error(f"Failed to load prev close: {e}")
+        log.error(f"CSV fallback also failed: {e}")
     return None
 
 
@@ -106,29 +114,33 @@ def run():
 
     # ---- 跌幅买入信号 ----
     if drop_pct <= DROP_ENTRY and not state.get("circuit_breaker"):
-        entry_price = prev_close * (1 + DROP_ENTRY)
-        target_price = entry_price * (1 + DROP_EXIT)
+        target_price = price * (1 + DROP_EXIT)
 
         # 首次触发：记录持仓到 state（支持日内反弹监控）
         if not state.get("drop_position"):
             state["drop_position"] = {
                 "buy_date": today,
-                "buy_price": round(entry_price, 2),
+                "buy_price": round(price, 2),
                 "days_held": 0,
             }
             save_state(state)
-            log.info(f"DROP position recorded: ${entry_price:.2f}")
+            # 同步写入 qbot DB
+            from qbot import db
+            db.open_position("EWY_DROP", "EWY", cfg.get("quantity", 100),
+                             round(price, 2), today)
+            log.info(f"DROP position recorded: ${price:.2f}")
 
         # 按整数百分点分档通知，避免重复
-        level = int(drop_pct * 100)  # e.g., -3, -5, -7
+        import math
+        level = math.floor(drop_pct * 100)  # e.g., -3, -5, -7 (向下取整，避免边界重复)
         if level not in alerts["drop_levels"]:
             alerts["drop_levels"].append(level)
 
             qty = cfg.get("quantity", 100)
             msg = (
                 f"🔴 <b>EWY 跌幅买入信号</b>\n\n"
-                f"👉 买入 {qty} 股 EWY @ ${entry_price:.2f}\n"
-                f"已跌 {abs(drop_pct)*100:.1f}%（当前 ${price:.2f}，前日收盘 ${prev_close:.2f}）\n\n"
+                f"👉 买入 {qty} 股 EWY @ <b>${price:.2f}</b>（市价）\n"
+                f"已跌 {abs(drop_pct)*100:.1f}%（前日收盘 ${prev_close:.2f}）\n\n"
                 f"反弹目标: ${target_price:.2f} (+{DROP_EXIT*100:.1f}%)\n"
                 f"最大持有: {cfg.get('drop_max_hold', 3)} 天\n\n"
                 f"⏰ {datetime.now().strftime('%H:%M ET')}"
@@ -159,6 +171,10 @@ def run():
             state["drop_position"] = None
             state["consecutive_exp_losses"] = 0
             save_state(state)
+            # 同步关闭 qbot DB 持仓
+            from qbot import db
+            for p in db.get_open_positions(strategy="EWY_DROP", symbol="EWY"):
+                db.close_position(p["id"])
 
             qty = cfg.get("quantity", 100)
             msg = (
@@ -172,7 +188,7 @@ def run():
             notifier.send_text(msg)
             log.info(f"Rebound alert sent: {rebound*100:+.1f}%, position closed")
 
-    # ---- IBS 持仓反弹/止损监控 ----
+    # ---- IBS 持仓监控 ----
     if state.get("ibs_position"):
         pos = state["ibs_position"]
         buy_price = pos["buy_price"]
@@ -180,8 +196,150 @@ def run():
         log.info(f"IBS position: {pos['buy_date']} @ ${buy_price:.2f}, "
                  f"current return={ret*100:+.2f}%")
 
+    # ---- IBS 收盘前信号检查（3:45 PM ET 之后）----
+    from zoneinfo import ZoneInfo
+    from datetime import time as dtime
+    now_et = datetime.now(ZoneInfo("America/New_York"))
+
+    if now_et.time() >= dtime(15, 45):
+        _check_ibs_pre_close(price, prev_close, state, alerts, today)
+
     save_alerts(alerts)
 
 
+def _check_ibs_pre_close(price: float, prev_close: float, state: dict, alerts: dict, today: str):
+    """收盘前 15 分钟检查 IBS 信号。用盘中 H/L + 当前价近似 IBS。"""
+    if alerts.get("ibs_alerted"):
+        return  # 今天已通知过
+
+    # 已有 IBS 持仓 → 检查是否该卖
+    ibs_sell = cfg.get("ibs_sell", 0.8)
+    ibs_buy = cfg.get("ibs_buy", 0.2)
+    max_hold = cfg.get("max_hold", 10)
+
+    # 获取今日盘中 High/Low
+    try:
+        import yfinance as yf
+        t = yf.Ticker("EWY")
+        info = t.fast_info
+        day_high = float(info.get("dayHigh", 0))
+        day_low = float(info.get("dayLow", 0))
+    except Exception as e:
+        log.error(f"Cannot get intraday H/L: {e}")
+        return
+
+    if day_high <= day_low or day_high == 0:
+        return
+
+    ibs = (price - day_low) / (day_high - day_low)
+    log.info(f"Pre-close IBS: {ibs:.4f} (H={day_high:.2f} L={day_low:.2f} C~{price:.2f})")
+
+    if state.get("ibs_position"):
+        pos = state["ibs_position"]
+        ret = (price / pos["buy_price"] - 1)
+        days = pos["days_held"] + 1  # 今天算一天
+
+        if ibs >= ibs_sell or days >= max_hold:
+            reason = f"IBS={ibs:.3f} >= {ibs_sell}" if ibs >= ibs_sell else f"持有 {days} 天到期"
+            alerts["ibs_alerted"] = True
+            qty = cfg.get("quantity", 100)
+            msg = (
+                f"🟢 <b>EWY IBS 卖出信号</b>\n\n"
+                f"👉 卖出 {qty} 股 EWY @ <b>${price:.2f}</b>\n"
+                f"买入: {pos['buy_date']} @ ${pos['buy_price']:.2f}\n"
+                f"收益: {ret*100:+.1f}%，持有 {days} 天\n"
+                f"原因: {reason}\n\n"
+                f"⏰ 收盘前 15 分钟"
+            )
+            notifier.send_text(msg)
+
+            # 平仓
+            state["trade_log"].append({
+                "buy_date": pos["buy_date"], "sell_date": today,
+                "buy_price": pos["buy_price"], "sell_price": round(price, 2),
+                "days": days, "ret": round(ret * 100, 2),
+                "reason": "IBS" if ibs >= ibs_sell else "EXP",
+            })
+            state["ibs_position"] = None
+            if ret < 0 and days >= max_hold:
+                state["consecutive_exp_losses"] = state.get("consecutive_exp_losses", 0) + 1
+            else:
+                state["consecutive_exp_losses"] = 0
+            save_state(state)
+            from qbot import db
+            for p in db.get_open_positions(strategy="EWY_IBS", symbol="EWY"):
+                db.close_position(p["id"])
+            log.info(f"IBS sell signal: {reason}, position closed")
+    else:
+        # 无持仓 → 检查买入
+        # MA200 过滤
+        try:
+            import yfinance as yf
+            data = yf.download("EWY", period="1y", interval="1d", progress=False)
+            ma200 = float(data["Close"].rolling(200).mean().iloc[-1])
+        except Exception:
+            ma200 = 0
+
+        above_ma = ma200 > 0 and price > ma200
+
+        if ibs < ibs_buy and above_ma and not state.get("circuit_breaker"):
+            alerts["ibs_alerted"] = True
+            qty = cfg.get("quantity", 100)
+            msg = (
+                f"🔵 <b>EWY IBS 买入信号</b>\n\n"
+                f"👉 买入 {qty} 股 EWY @ <b>${price:.2f}</b>\n"
+                f"IBS = {ibs:.4f}（阈值 &lt; {ibs_buy}）\n"
+                f"MA200 = ${ma200:.2f} ✅\n\n"
+                f"卖出条件: IBS &gt; {ibs_sell} 或持有 {max_hold} 天\n\n"
+                f"⏰ 收盘前 15 分钟"
+            )
+            notifier.send_text(msg)
+
+            # 记持仓
+            state["ibs_position"] = {
+                "buy_date": today,
+                "buy_price": round(price, 2),
+                "days_held": 0,
+            }
+            save_state(state)
+            from qbot import db
+            db.open_position("EWY_IBS", "EWY", qty, round(price, 2), today)
+            log.info(f"IBS buy signal: IBS={ibs:.4f}, price=${price:.2f}")
+        else:
+            reasons = []
+            if ibs >= ibs_buy:
+                reasons.append(f"IBS={ibs:.3f}")
+            if not above_ma:
+                reasons.append(f"Close<MA200" if ma200 > 0 else "MA200 N/A")
+            if state.get("circuit_breaker"):
+                reasons.append("circuit breaker")
+            if reasons:
+                log.info(f"IBS no entry ({', '.join(reasons)})")
+
+
+def is_market_hours() -> bool:
+    """美东 9:30-16:00 开盘时段。"""
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("America/New_York"))
+    if now.weekday() >= 5:
+        return False
+    t = now.time()
+    from datetime import time as dtime
+    return dtime(9, 30) <= t <= dtime(16, 0)
+
+
 if __name__ == "__main__":
-    run()
+    import time
+
+    if "--once" in sys.argv:
+        run()
+    else:
+        # 持续运行模式：每 60 秒检查一次，仅盘中运行
+        log.info("Starting continuous monitor (60s interval)")
+        while True:
+            if is_market_hours():
+                try:
+                    run()
+                except Exception as e:
+                    log.error(f"Run error: {e}")
+            time.sleep(60)
