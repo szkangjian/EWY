@@ -28,6 +28,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 import warnings
+from ewy_market_data import build_daily_bars, load_minute_data, load_regular_session_data
+
 warnings.filterwarnings('ignore')
 
 # ---- 配置 ----
@@ -63,16 +65,8 @@ def save_state(state):
 
 def build_daily(csv_path):
     """从分钟数据构建日线 + 技术指标"""
-    df = pd.read_csv(csv_path, parse_dates=['timestamp'])
-    df = df.sort_values('timestamp').reset_index(drop=True)
-    df['date'] = df['timestamp'].dt.date
-
-    daily = df.groupby('date').agg(
-        Open=('Open', 'first'), High=('High', 'max'),
-        Low=('Low', 'min'), Close=('Close', 'last'), Vol=('Volume', 'sum')
-    ).reset_index()
-    daily = daily.sort_values('date').reset_index(drop=True)
-    daily['date'] = pd.to_datetime(daily['date'])
+    df = load_regular_session_data(csv_path)
+    daily = build_daily_bars(df)
 
     daily['ma200'] = daily['Close'].rolling(MA_PERIOD).mean()
     daily['IBS'] = (daily['Close'] - daily['Low']) / (daily['High'] - daily['Low'])
@@ -370,7 +364,7 @@ def update_data():
     data.index.name = 'timestamp'
     data = data[['Open', 'High', 'Low', 'Close', 'Volume']]
 
-    hist = pd.read_csv(DATA_CSV, index_col='timestamp', parse_dates=True)
+    hist = load_minute_data(DATA_CSV).set_index('timestamp')
     combined = pd.concat([hist, data])
     combined = combined[~combined.index.duplicated(keep='last')]
     combined.sort_index(inplace=True)

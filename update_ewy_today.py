@@ -3,6 +3,7 @@
 """
 import yfinance as yf
 import pandas as pd
+from ewy_market_data import load_minute_data
 
 MAIN_CSV = "ewy_minute_data.csv"
 
@@ -25,8 +26,8 @@ data = data[['Open', 'High', 'Low', 'Close', 'Volume']]
 print(f"✅ 获取到 {len(data)} 条今日分钟数据")
 print(f"   范围: {data.index.min()} → {data.index.max()}")
 
-# 读取历史并合并（确保 index 都是 datetime 类型）
-hist = pd.read_csv(MAIN_CSV, index_col='timestamp', parse_dates=True)
+# 读取历史并合并（统一到 US/Eastern）
+hist = load_minute_data(MAIN_CSV).set_index('timestamp')
 print(f"📊 历史数据: {len(hist)} 条")
 
 combined = pd.concat([hist, data])

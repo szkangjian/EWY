@@ -14,20 +14,18 @@ EWY 盘中均值回归策略回测（分钟级）
 import pandas as pd
 import numpy as np
 import warnings
+from ewy_market_data import build_daily_bars, load_regular_session_data
+
 warnings.filterwarnings('ignore')
 
 
 def load_data(csv_path="ewy_minute_data.csv"):
     print("加载分钟数据...")
-    df = pd.read_csv(csv_path, parse_dates=['timestamp'])
-    df['date'] = df['timestamp'].dt.date
+    df = load_regular_session_data(csv_path)
     print(f"  {len(df)} 条分钟数据")
 
     # 日线用于确定前日收盘
-    daily = df.groupby('date').agg(
-        day_open=('Open', 'first'),
-        day_close=('Close', 'last'),
-    ).reset_index()
+    daily = build_daily_bars(df).rename(columns={'Open': 'day_open', 'Close': 'day_close'})
     daily['date'] = pd.to_datetime(daily['date']).dt.date
     daily = daily.sort_values('date').reset_index(drop=True)
     daily['prev_close'] = daily['day_close'].shift(1)

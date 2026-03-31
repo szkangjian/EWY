@@ -1,20 +1,15 @@
 import pandas as pd
 import numpy as np
 import warnings
+from ewy_market_data import build_daily_bars, load_regular_session_data
+
 warnings.filterwarnings('ignore')
 
 print("加载数据...")
-df = pd.read_csv('ewy_minute_data.csv', parse_dates=['timestamp'])
-df = df.sort_values('timestamp').reset_index(drop=True)
-df['date'] = df['timestamp'].dt.date
+df = load_regular_session_data('ewy_minute_data.csv')
 
 # 构建日线
-daily = df.groupby('date').agg(
-    Open=('Open','first'), High=('High','max'),
-    Low=('Low','min'), Close=('Close','last'), Vol=('Volume','sum')
-).reset_index()
-daily = daily.sort_values('date').reset_index(drop=True)
-daily['date'] = pd.to_datetime(daily['date'])
+daily = build_daily_bars(df)
 
 # 技术指标
 daily['ma200'] = daily['Close'].rolling(200).mean()
