@@ -4,7 +4,7 @@
 >
 > 参考 STRC 税务分析框架（06_strc_tax_wash_sale.md / 07_strc_tax_nra.md），针对 EWY IBS 策略的税务影响。
 >
-> **口径说明**：本文重点讨论税务框架，不是重新做税务优化。文中的部分收益示例仍引用旧版回测数字，使用前请先以 [03_ewy_strategy_research.md](03_ewy_strategy_research.md) 的 v2 回测结果更新收益假设。
+> **注意**：本文重点讨论税务框架。文中的部分收益示例为估算值，实际收益请以 [03_ewy_strategy_research.md](03_ewy_strategy_research.md) 的回测结果为准。
 
 ---
 
