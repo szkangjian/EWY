@@ -3,9 +3,9 @@ EWY IBS + 跌幅反弹策略 — qbot Strategy 实现。
 
 两个子策略:
   - IBS 均值回归: Buy IBS<0.2 & Close>MA200, Sell IBS>0.8 or max_hold 10天
-  - 跌幅反弹: Buy 盘中跌>3%, Sell 反弹+2.5% or max_hold 3天
+  - 跌幅反弹: Buy 盘中跌>3.5%, Sell 反弹+2.0% or max_hold 5天
 
-数据源: ewy_minute_data.csv → 日线构建
+数据源: ewy_minute_data.csv → 统一到 US/Eastern 常规交易时段后构建日线
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from qbot.strategy_base import Strategy
 from qbot.models import Signal, OrderSuggestion, CheckResult
 from qbot import config, db
 from qbot.log_util import get_logger
+from ewy_market_data import build_daily_bars, load_minute_data, load_regular_session_data
 
 log = get_logger("ewy_strategy", "EWY")
 
@@ -35,9 +36,9 @@ DEFAULTS = {
     "ibs_buy": 0.2,
     "ibs_sell": 0.8,
     "max_hold": 10,
-    "drop_entry": -0.03,
-    "drop_exit": 0.025,
-    "drop_max_hold": 3,
+    "drop_entry": -0.035,
+    "drop_exit": 0.02,
+    "drop_max_hold": 5,
     "circuit_breaker_losses": 3,
 }
 
@@ -102,7 +103,7 @@ class EWYStrategy(Strategy):
         data.index.name = 'timestamp'
         data = data[['Open', 'High', 'Low', 'Close', 'Volume']]
 
-        hist = pd.read_csv(DATA_CSV, index_col='timestamp', parse_dates=True)
+        hist = load_minute_data(str(DATA_CSV)).set_index('timestamp')
         combined = pd.concat([hist, data])
         combined = combined[~combined.index.duplicated(keep='last')]
         combined.sort_index(inplace=True)
@@ -112,16 +113,7 @@ class EWYStrategy(Strategy):
 
     def _build_daily(self):
         """从分钟数据构建日线。"""
-        df = pd.read_csv(DATA_CSV, parse_dates=['timestamp'])
-        df = df.sort_values('timestamp').reset_index(drop=True)
-        df['date'] = df['timestamp'].dt.date
-
-        daily = df.groupby('date').agg(
-            Open=('Open', 'first'), High=('High', 'max'),
-            Low=('Low', 'min'), Close=('Close', 'last'), Vol=('Volume', 'sum')
-        ).reset_index()
-        daily = daily.sort_values('date').reset_index(drop=True)
-        daily['date'] = pd.to_datetime(daily['date'])
+        daily = build_daily_bars(load_regular_session_data(str(DATA_CSV)))
 
         ma = self.params['ma_period']
         daily['ma200'] = daily['Close'].rolling(ma).mean()

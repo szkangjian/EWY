@@ -12,6 +12,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
@@ -21,17 +22,20 @@ import pandas as pd
 from qbot import config, notifier
 from qbot.data_feed import get_quote
 from qbot.log_util import get_logger
+from ewy_market_data import load_daily_bars
 
 log = get_logger("intraday_monitor", "EWY")
 
 DATA_CSV = Path(__file__).parent / "ewy_minute_data.csv"
 STATE_FILE = Path(__file__).parent / "ewy_signal_state.json"
 ALERT_FILE = Path(__file__).parent / ".ewy_intraday_alerts.json"
+MARKET_TZ = ZoneInfo("US/Eastern")
 
 # 参数
 cfg = config.strategy_params("EWY_IBS") or {}
-DROP_ENTRY = cfg.get("drop_entry", -0.03)
-DROP_EXIT = cfg.get("drop_exit", 0.025)
+DROP_ENTRY = cfg.get("drop_entry", -0.035)
+DROP_EXIT = cfg.get("drop_exit", 0.02)
+DROP_MAX_HOLD = cfg.get("drop_max_hold", 5)
 
 
 def load_prev_close() -> float | None:
@@ -46,9 +50,7 @@ def load_prev_close() -> float | None:
         log.error(f"Yahoo prev close failed: {e}")
     # 回退到本地 CSV
     try:
-        df = pd.read_csv(DATA_CSV, parse_dates=['timestamp'])
-        df['date'] = df['timestamp'].dt.date
-        daily = df.groupby('date').agg(Close=('Close', 'last')).sort_values('date')
+        daily = load_daily_bars(str(DATA_CSV))
         if len(daily) >= 1:
             return float(daily.iloc[-1]['Close'])
     except Exception as e:
@@ -58,7 +60,7 @@ def load_prev_close() -> float | None:
 
 def load_alerts() -> dict:
     """加载今日已发送的告警记录。"""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(MARKET_TZ).strftime("%Y-%m-%d")
     try:
         if ALERT_FILE.exists():
             data = json.loads(ALERT_FILE.read_text())
@@ -90,8 +92,9 @@ def save_state(state: dict):
 
 
 def run():
-    today = datetime.now().strftime("%Y-%m-%d")
-    log.info(f"=== EWY Intraday Check {datetime.now().strftime('%H:%M')} ===")
+    now_et = datetime.now(MARKET_TZ)
+    today = now_et.strftime("%Y-%m-%d")
+    log.info(f"=== EWY Intraday Check {now_et.strftime('%H:%M ET')} ===")
 
     # 获取前日收盘
     prev_close = load_prev_close()
@@ -142,8 +145,8 @@ def run():
                 f"👉 买入 {qty} 股 EWY @ <b>${price:.2f}</b>（市价）\n"
                 f"已跌 {abs(drop_pct)*100:.1f}%（前日收盘 ${prev_close:.2f}）\n\n"
                 f"反弹目标: ${target_price:.2f} (+{DROP_EXIT*100:.1f}%)\n"
-                f"最大持有: {cfg.get('drop_max_hold', 3)} 天\n\n"
-                f"⏰ {datetime.now().strftime('%H:%M ET')}"
+                f"最大持有: {DROP_MAX_HOLD} 天\n\n"
+                f"⏰ {datetime.now(MARKET_TZ).strftime('%H:%M ET')}"
             )
             notifier.send_text(msg)
             log.info(f"DROP alert sent: level={level}%")
@@ -183,7 +186,7 @@ def run():
                 f"当前: <b>${price:.2f}</b>\n"
                 f"收益: {rebound*100:+.1f}%（目标 +{DROP_EXIT*100:.1f}%）\n\n"
                 f"建议立即卖出\n"
-                f"⏰ {datetime.now().strftime('%H:%M ET')}"
+                f"⏰ {datetime.now(MARKET_TZ).strftime('%H:%M ET')}"
             )
             notifier.send_text(msg)
             log.info(f"Rebound alert sent: {rebound*100:+.1f}%, position closed")
@@ -197,9 +200,8 @@ def run():
                  f"current return={ret*100:+.2f}%")
 
     # ---- IBS 收盘前信号检查（3:45 PM ET 之后）----
-    from zoneinfo import ZoneInfo
     from datetime import time as dtime
-    now_et = datetime.now(ZoneInfo("America/New_York"))
+    now_et = datetime.now(MARKET_TZ)
 
     if now_et.time() >= dtime(15, 45):
         _check_ibs_pre_close(price, prev_close, state, alerts, today)

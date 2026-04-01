@@ -4,8 +4,8 @@ EWY 实时分钟 K 线监控 + 策略信号提醒 (Finnhub WebSocket)
 功能:
   - 通过 Finnhub WebSocket 接收 EWY 逐笔成交
   - 实时聚合为 1 分钟 K 线 (OHLCV)
-  - 盘中跌幅策略: 跌破前日收盘 -3% 时提醒买入
-  - 盘中反弹监控: 持仓时监控反弹 +2.5% 目标
+  - 盘中跌幅策略: 跌破前日收盘 -3.5% 时提醒买入
+  - 盘中反弹监控: 持仓时监控反弹 +2.0% 目标
   - IBS 策略: 15:50 后开始计算实时 IBS，提醒收盘操作
   - 持仓状态与 ewy_signal.py 共享 (ewy_signal_state.json)
   - 收盘后自动追加到历史 CSV
@@ -45,8 +45,8 @@ TODAY_CSV = f"ewy_realtime_{datetime.now(MARKET_TZ).strftime('%Y%m%d')}.csv"
 STATE_FILE = "ewy_signal_state.json"
 
 # 策略参数
-DROP_ENTRY = -0.03       # 跌幅触发: -3%
-DROP_EXIT = 0.025        # 反弹目标: +2.5%
+DROP_ENTRY = -0.035      # 跌幅触发: -3.5%
+DROP_EXIT = 0.02         # 反弹目标: +2.0%
 IBS_BUY = 0.2            # IBS 买入阈值
 IBS_SELL = 0.8           # IBS 卖出阈值
 
