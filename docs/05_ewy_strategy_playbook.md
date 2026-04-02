@@ -3,6 +3,8 @@
 > **版本**: v2.0 | **最后更新**: 2026-04-01
 >
 > 策略研究详见 [03_ewy_strategy_research.md](03_ewy_strategy_research.md)。
+>
+> **本文所有"天"均指交易日，非自然日。**
 
 ---
 

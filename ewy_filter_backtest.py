@@ -284,20 +284,24 @@ ibs_trades = []
 holding = False
 buy_p = 0
 buy_d = ''
+buy_i = 0
 for i in range(200, len(daily)):
     row = daily.iloc[i]
     if not holding:
         if row['IBS'] < 0.2 and row['Close'] > row['ma200']:
             buy_p = row['Close']
             buy_d = str(row['date'].date())
+            buy_i = i
             holding = True
     else:
-        if row['IBS'] > 0.8 or (pd.Timestamp(row['date']) - pd.Timestamp(buy_d)).days > 10:
+        days_held = i - buy_i
+        if row['IBS'] > 0.8 or days_held >= 10:
             sell_p = row['Close']
             ret = sell_p / buy_p - 1
             reason = 'IBS>0.8' if row['IBS'] > 0.8 else 'EXP'
             ibs_trades.append({'date': buy_d, 'buy': round(buy_p,2),
-                              'sell': round(sell_p,2), 'reason': reason, 'ret': ret})
+                              'sell': round(sell_p,2), 'reason': reason, 'ret': ret,
+                              'days': days_held})
             holding = False
 
 if ibs_trades:
@@ -307,7 +311,8 @@ if ibs_trades:
     total = tdf_ibs_pure['ret'].sum() * 100
     avg = tdf_ibs_pure['ret'].mean() * 100
     worst = tdf_ibs_pure['ret'].min() * 100
-    print(f"  笔数: {n}, 胜率: {wins/n*100:.0f}%")
+    avg_days = tdf_ibs_pure['days'].mean()
+    print(f"  笔数: {n}, 胜率: {wins/n*100:.0f}%, 平均持有: {avg_days:.1f} 交易日")
     print(f"  总收益: {total:+.1f}%, 均收益: {avg:+.2f}%, 最大亏损: {worst:+.2f}%")
 
 # ============ 打印逐笔对比 ============

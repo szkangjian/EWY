@@ -2,8 +2,8 @@
 EWY IBS + 跌幅反弹策略 — qbot Strategy 实现。
 
 两个子策略:
-  - IBS 均值回归: Buy IBS<0.2 & Close>MA200, Sell IBS>0.8 or max_hold 10天
-  - 跌幅反弹: Buy 盘中跌>3.5%, Sell 反弹+2.0% or max_hold 5天
+  - IBS 均值回归: Buy IBS<0.2 & Close>MA200, Sell IBS>0.8 or max_hold 10个交易日
+  - 跌幅反弹: Buy 盘中跌>3.5%, Sell 反弹+2.0% or max_hold 5个交易日
 
 数据源: ewy_minute_data.csv → 统一到 US/Eastern 常规交易时段后构建日线
 """
