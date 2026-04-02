@@ -8,8 +8,8 @@ EWY 每日交易信号生成器
     最大持有: 10 个交易日
 
   辅助策略 — 跌幅触发反弹
-    买入: 盘中跌幅 > 3.5% (vs 前日收盘)
-    卖出: 反弹 +2.0% 或持有 5 个交易日
+    买入: 盘中跌幅 > 4.5% (vs 前日收盘)
+    卖出: 反弹 +2.5% 或持有 5 个交易日
     (盘中监控，需配合 realtime_ewy.py)
 
 用法:
@@ -39,8 +39,8 @@ MA_PERIOD = 200
 IBS_BUY = 0.2
 IBS_SELL = 0.8
 MAX_HOLD = 10
-DROP_ENTRY = -0.035
-DROP_EXIT = 0.02
+DROP_ENTRY = -0.045
+DROP_EXIT = 0.025
 DROP_MAX_HOLD = 5
 CIRCUIT_BREAKER_LOSSES = 3  # 连续到期亏损次数触发熔断
 
