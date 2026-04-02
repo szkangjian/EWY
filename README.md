@@ -91,7 +91,5 @@ EWY/
 ├── ewy_filter_backtest.py         # 过滤器对比测试
 ├── backtest_mean_reversion.py     # 日线均值回归回测
 ├── backtest_mean_reversion_intraday.py # 分钟级均值回归回测
-├── ewy_minute_data.csv            # EWY 原始分钟级 OHLCV
-├── strc_minute_data.csv           # STRC 对照数据
-└── strf_minute_data.csv           # STRF 对照数据
+└── ewy_minute_data.csv            # EWY 原始分钟级 OHLCV
 ```
