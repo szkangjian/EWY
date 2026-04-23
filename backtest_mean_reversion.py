@@ -9,24 +9,15 @@ EWY 大跌后短期反弹策略回测
 import pandas as pd
 import numpy as np
 import warnings
+from ewy_market_data import load_daily_bars
+
 warnings.filterwarnings('ignore')
 
 
 def load_daily_data(csv_path="ewy_minute_data.csv"):
     """从分钟数据聚合为日线"""
     print("加载分钟数据并聚合为日线...")
-    df = pd.read_csv(csv_path, parse_dates=['timestamp'])
-    df['date'] = df['timestamp'].dt.date
-
-    daily = df.groupby('date').agg(
-        Open=('Open', 'first'),
-        High=('High', 'max'),
-        Low=('Low', 'min'),
-        Close=('Close', 'last'),
-        Volume=('Volume', 'sum')
-    ).reset_index()
-    daily['date'] = pd.to_datetime(daily['date'])
-    daily = daily.sort_values('date').reset_index(drop=True)
+    daily = load_daily_bars(csv_path).rename(columns={'Vol': 'Volume'})
     daily['ret'] = daily['Close'].pct_change()
     print(f"  日线数据: {len(daily)} 天 ({daily['date'].iloc[0].date()} → {daily['date'].iloc[-1].date()})")
     return daily

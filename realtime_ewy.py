@@ -4,7 +4,7 @@ EWY 实时分钟 K 线监控 + 策略信号提醒 (Finnhub WebSocket)
 功能:
   - 通过 Finnhub WebSocket 接收 EWY 逐笔成交
   - 实时聚合为 1 分钟 K 线 (OHLCV)
-  - 盘中跌幅策略: 跌破前日收盘 -3% 时提醒买入
+  - 盘中跌幅策略: 跌破前日收盘 -4.5% 时提醒买入
   - 盘中反弹监控: 持仓时监控反弹 +2.5% 目标
   - IBS 策略: 15:50 后开始计算实时 IBS，提醒收盘操作
   - 持仓状态与 ewy_signal.py 共享 (ewy_signal_state.json)
@@ -23,6 +23,7 @@ import sys
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 try:
     import websocket
@@ -34,15 +35,17 @@ except ImportError:
 import pandas as pd
 import numpy as np
 from config import FINNHUB_KEY
+from ewy_market_data import load_daily_bars, load_minute_data
 
 # ---- 配置 ----
 TICKER = "EWY"
 HISTORY_CSV = "ewy_minute_data.csv"
-TODAY_CSV = f"ewy_realtime_{datetime.now().strftime('%Y%m%d')}.csv"
+MARKET_TZ = ZoneInfo("US/Eastern")
+TODAY_CSV = f"ewy_realtime_{datetime.now(MARKET_TZ).strftime('%Y%m%d')}.csv"
 STATE_FILE = "ewy_signal_state.json"
 
 # 策略参数
-DROP_ENTRY = -0.03       # 跌幅触发: -3%
+DROP_ENTRY = -0.045      # 跌幅触发: -4.5%
 DROP_EXIT = 0.025        # 反弹目标: +2.5%
 IBS_BUY = 0.2            # IBS 买入阈值
 IBS_SELL = 0.8           # IBS 卖出阈值
@@ -91,14 +94,7 @@ def load_prev_day_context():
     """从历史数据加载前日收盘、MA200"""
     global prev_close, ma200
     try:
-        df = pd.read_csv(HISTORY_CSV, parse_dates=['timestamp'])
-        df = df.sort_values('timestamp').reset_index(drop=True)
-        df['date'] = df['timestamp'].dt.date
-
-        daily = df.groupby('date').agg(
-            Close=('Close', 'last')
-        ).reset_index()
-        daily = daily.sort_values('date').reset_index(drop=True)
+        daily = load_daily_bars(HISTORY_CSV)
 
         if len(daily) >= 1:
             prev_close = daily.iloc[-1]['Close']
@@ -140,7 +136,7 @@ def check_signals(price):
     day_low = min(day_low, price) if day_low else price
     day_close = price
 
-    now = datetime.now()
+    now = datetime.now(MARKET_TZ)
     drop_from_prev = (price / prev_close - 1)
 
     # ---- 熔断检查 ----
@@ -204,7 +200,8 @@ def check_signals(price):
 
 def get_minute_key(ts_ms):
     """将毫秒时间戳转为分钟 key"""
-    dt = datetime.fromtimestamp(ts_ms / 1000)
+    dt = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).astimezone(MARKET_TZ)
+    dt = dt.replace(second=0, microsecond=0, tzinfo=None)
     return dt.strftime('%Y-%m-%d %H:%M')
 
 
@@ -258,7 +255,7 @@ def print_candle(minute_key):
 
 def print_live_tick(price, volume):
     """实时显示最新成交"""
-    now = datetime.now().strftime('%H:%M:%S')
+    now = datetime.now(MARKET_TZ).strftime('%H:%M:%S')
     drop_str = ""
     if prev_close:
         drop_pct = (price / prev_close - 1) * 100
@@ -295,12 +292,13 @@ def save_candles():
 
     df = pd.DataFrame.from_dict(candles, orient='index')
     df.index.name = 'timestamp'
+    df.index = pd.to_datetime(df.index)
     df.sort_index(inplace=True)
     df.to_csv(TODAY_CSV)
     print(f"\n当日数据已保存至 {TODAY_CSV} ({len(df)} 条K线)")
 
     try:
-        hist = pd.read_csv(HISTORY_CSV, index_col='timestamp')
+        hist = load_minute_data(HISTORY_CSV).set_index('timestamp')
         combined = pd.concat([hist, df])
         combined = combined[~combined.index.duplicated(keep='last')]
         combined.sort_index(inplace=True)

@@ -45,10 +45,12 @@ log = get_logger("intraday_monitor", "EWY")
 DATA_CSV = Path(__file__).parent / "ewy_minute_data.csv"
 STATE_FILE = Path(__file__).parent / "ewy_signal_state.json"
 ALERT_FILE = Path(__file__).parent / ".ewy_intraday_alerts.json"
+MARKET_TZ = ZoneInfo("US/Eastern")
 
 cfg = config.strategy_params("EWY_IBS") or {}
-DROP_ENTRY = cfg.get("drop_entry", -0.03)
+DROP_ENTRY = cfg.get("drop_entry", -0.045)
 DROP_EXIT = cfg.get("drop_exit", 0.025)
+DROP_MAX_HOLD = cfg.get("drop_max_hold", 5)
 
 
 # ── Prev close / state / alert 文件 ───────────────────────────
@@ -64,9 +66,7 @@ def load_prev_close() -> float | None:
     except Exception as e:
         log.error(f"Yahoo prev close failed: {e}")
     try:
-        df = pd.read_csv(DATA_CSV, parse_dates=['timestamp'])
-        df['date'] = df['timestamp'].dt.date
-        daily = df.groupby('date').agg(Close=('Close', 'last')).sort_values('date')
+        daily = load_daily_bars(str(DATA_CSV))
         if len(daily) >= 1:
             return float(daily.iloc[-1]['Close'])
     except Exception as e:

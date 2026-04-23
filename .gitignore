@@ -2,10 +2,12 @@
 __pycache__/
 *.pyc
 .venv/
+venv/
 .vscode/
 
-# Data files (too large for git)
-*.csv
+# Generated local data
+ewy_realtime_*.csv
+ewy_minute_data_reconstructed.csv
 
 # API Keys
 config.py

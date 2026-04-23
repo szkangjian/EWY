@@ -11,6 +11,7 @@ import numpy as np
 import requests
 import yfinance as yf
 from config import POLYGON_KEY
+from ewy_market_data import load_regular_session_data
 
 CSV_FILE = 'ewy_minute_data.csv'
 
@@ -53,14 +54,15 @@ def fetch_ex_dates_yf():
 # ==========================================
 print("📊 加载 EWY 分钟级数据...")
 try:
-    df = pd.read_csv(CSV_FILE, index_col='timestamp', parse_dates=True)
+    df = load_regular_session_data(CSV_FILE).set_index('timestamp')
 except FileNotFoundError:
     print(f"❌ 未找到 {CSV_FILE}，请先运行 download_ewy_polygon.py")
     exit(1)
 
-daily = df.resample('D').agg({
+daily = df.groupby(df.index.date).agg({
     'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
 }).dropna()
+daily.index = pd.to_datetime(daily.index)
 
 print(f"   分钟数据: {len(df):,} 条")
 print(f"   日线数据: {len(daily)} 天")

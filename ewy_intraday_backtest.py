@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
 import warnings
+from ewy_market_data import load_regular_session_data
+
 warnings.filterwarnings('ignore')
 
 print("加载数据...")
-df = pd.read_csv('ewy_minute_data.csv', parse_dates=['timestamp'])
-df = df.sort_values('timestamp').reset_index(drop=True)
-df['date'] = df['timestamp'].dt.date
+df = load_regular_session_data('ewy_minute_data.csv')
 
 dates = sorted(df['date'].unique())
 day_arrays = {}

@@ -1,20 +1,15 @@
 import pandas as pd
 import numpy as np
 import warnings
+from ewy_market_data import build_daily_bars, load_regular_session_data
+
 warnings.filterwarnings('ignore')
 
 print("加载数据...")
-df = pd.read_csv('ewy_minute_data.csv', parse_dates=['timestamp'])
-df = df.sort_values('timestamp').reset_index(drop=True)
-df['date'] = df['timestamp'].dt.date
+df = load_regular_session_data('ewy_minute_data.csv')
 
 # 构建日线
-daily = df.groupby('date').agg(
-    Open=('Open','first'), High=('High','max'),
-    Low=('Low','min'), Close=('Close','last'), Vol=('Volume','sum')
-).reset_index()
-daily = daily.sort_values('date').reset_index(drop=True)
-daily['date'] = pd.to_datetime(daily['date'])
+daily = build_daily_bars(df)
 
 # 技术指标
 daily['ma200'] = daily['Close'].rolling(200).mean()
@@ -289,20 +284,24 @@ ibs_trades = []
 holding = False
 buy_p = 0
 buy_d = ''
+buy_i = 0
 for i in range(200, len(daily)):
     row = daily.iloc[i]
     if not holding:
         if row['IBS'] < 0.2 and row['Close'] > row['ma200']:
             buy_p = row['Close']
             buy_d = str(row['date'].date())
+            buy_i = i
             holding = True
     else:
-        if row['IBS'] > 0.8 or (pd.Timestamp(row['date']) - pd.Timestamp(buy_d)).days > 10:
+        days_held = i - buy_i
+        if row['IBS'] > 0.8 or days_held >= 10:
             sell_p = row['Close']
             ret = sell_p / buy_p - 1
             reason = 'IBS>0.8' if row['IBS'] > 0.8 else 'EXP'
             ibs_trades.append({'date': buy_d, 'buy': round(buy_p,2),
-                              'sell': round(sell_p,2), 'reason': reason, 'ret': ret})
+                              'sell': round(sell_p,2), 'reason': reason, 'ret': ret,
+                              'days': days_held})
             holding = False
 
 if ibs_trades:
@@ -312,7 +311,8 @@ if ibs_trades:
     total = tdf_ibs_pure['ret'].sum() * 100
     avg = tdf_ibs_pure['ret'].mean() * 100
     worst = tdf_ibs_pure['ret'].min() * 100
-    print(f"  笔数: {n}, 胜率: {wins/n*100:.0f}%")
+    avg_days = tdf_ibs_pure['days'].mean()
+    print(f"  笔数: {n}, 胜率: {wins/n*100:.0f}%, 平均持有: {avg_days:.1f} 交易日")
     print(f"  总收益: {total:+.1f}%, 均收益: {avg:+.2f}%, 最大亏损: {worst:+.2f}%")
 
 # ============ 打印逐笔对比 ============

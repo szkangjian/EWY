@@ -13,7 +13,11 @@ import pandas as pd
 import time
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from zoneinfo import ZoneInfo
 from config import POLYGON_KEY
+from ewy_market_data import normalize_timestamp_series
+
+MARKET_TZ = ZoneInfo("US/Eastern")
 
 # ---- 配置 ----
 API_KEY = POLYGON_KEY
@@ -22,7 +26,7 @@ OUTPUT_FILE = "ewy_minute_data.csv"
 
 # 起始和结束日期
 # EWY 历史悠久，但 Polygon 免费版分钟数据回溯有限，取近 2 年
-END_DATE = datetime.now().date()
+END_DATE = datetime.now(MARKET_TZ).date()
 START_DATE = datetime(2024, 3, 1).date()
 
 # 每批覆盖的天数（~1 个月，确保不超 50,000 条）
@@ -46,6 +50,7 @@ def fetch_batch(date_from: str, date_to: str) -> pd.DataFrame | None:
             return None
         df = pd.DataFrame(results)
         df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
+        df['timestamp'] = normalize_timestamp_series(df['timestamp'], source_tz='UTC')
         df.set_index('timestamp', inplace=True)
         df.rename(columns={
             'o': 'Open', 'h': 'High', 'l': 'Low',
