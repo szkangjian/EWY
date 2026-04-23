@@ -1,11 +1,72 @@
 {
   "ibs_position": null,
-  "drop_position": {
-    "buy_date": "2026-03-23",
-    "buy_price": 124.4,
-    "days_held": 0
-  },
-  "trade_log": [],
+  "drop_position": null,
+  "trade_log": [
+    {
+      "buy_date": "2026-03-23",
+      "sell_date": "2026-03-23",
+      "buy_price": 124.4,
+      "sell_price": 127.51,
+      "days": 1,
+      "ret": 2.5,
+      "reason": "TP"
+    },
+    {
+      "buy_date": "2026-03-26",
+      "sell_date": "2026-03-30",
+      "buy_price": 121.0,
+      "sell_price": 116.42,
+      "days": 3,
+      "ret": -3.79,
+      "reason": "EXP"
+    },
+    {
+      "buy_date": "2026-03-26",
+      "sell_date": "2026-03-31",
+      "buy_price": 120.98,
+      "sell_price": 121.88,
+      "days": 4,
+      "ret": 0.74,
+      "reason": "IBS"
+    },
+    {
+      "buy_date": "2026-04-02",
+      "sell_date": "2026-04-02",
+      "buy_price": 117.34,
+      "sell_price": 120.27,
+      "days": 0,
+      "ret": 2.5,
+      "reason": "TP"
+    },
+    {
+      "buy_date": "2026-04-02",
+      "sell_date": "2026-04-06",
+      "buy_price": 120.22,
+      "sell_price": 123.23,
+      "days": 1,
+      "ret": 2.5,
+      "reason": "TP"
+    },
+    {
+      "buy_date": "2026-04-07",
+      "sell_date": "2026-04-07",
+      "buy_price": 123.52,
+      "sell_price": 126.61,
+      "days": 0,
+      "ret": 2.5,
+      "reason": "TP"
+    },
+    {
+      "buy_date": "2026-04-21",
+      "sell_date": "2026-04-22",
+      "buy_price": 147.0,
+      "sell_price": 155.75,
+      "days": 2,
+      "ret": 5.95,
+      "reason": "IBS"
+    }
+  ],
   "consecutive_exp_losses": 0,
-  "circuit_breaker": false
+  "circuit_breaker": false,
+  "last_processed_date": "2026-04-23"
 }
