@@ -33,8 +33,8 @@ log = get_logger("ewy_strategy", "EWY")
 DEFAULTS = {
     "quantity": 100,
     "ma_period": 200,
-    "ibs_buy": 0.2,
-    "ibs_sell": 0.8,
+    "ibs_buy": 0.45,
+    "ibs_sell": 0.90,
     "max_hold": 10,
     "drop_entry": -0.035,
     "drop_exit": 0.025,

@@ -279,8 +279,8 @@ def _check_ibs_pre_close(price: float, prev_close: float, state: dict,
     if alerts.get("ibs_alerted"):
         return
 
-    ibs_sell = cfg.get("ibs_sell", 0.8)
-    ibs_buy = cfg.get("ibs_buy", 0.2)
+    ibs_sell = cfg.get("ibs_sell", 0.90)
+    ibs_buy = cfg.get("ibs_buy", 0.45)
     max_hold = cfg.get("max_hold", 10)
 
     try:
