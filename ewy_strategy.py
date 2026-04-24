@@ -36,7 +36,7 @@ DEFAULTS = {
     "ibs_buy": 0.2,
     "ibs_sell": 0.8,
     "max_hold": 10,
-    "drop_entry": -0.045,
+    "drop_entry": -0.035,
     "drop_exit": 0.025,
     "drop_max_hold": 5,
     "circuit_breaker_losses": 3,

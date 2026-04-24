@@ -48,7 +48,7 @@ ALERT_FILE = Path(__file__).parent / ".ewy_intraday_alerts.json"
 MARKET_TZ = ZoneInfo("US/Eastern")
 
 cfg = config.strategy_params("EWY_IBS") or {}
-DROP_ENTRY = cfg.get("drop_entry", -0.045)
+DROP_ENTRY = cfg.get("drop_entry", -0.035)
 DROP_EXIT = cfg.get("drop_exit", 0.025)
 DROP_MAX_HOLD = cfg.get("drop_max_hold", 5)
 
